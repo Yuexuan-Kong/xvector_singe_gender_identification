@@ -1,3 +1,7 @@
+"""
+This file contains some functions for data preparing and tensorboard loggers.
+"""
+
 from speechbrain.utils.train_logger import TrainLogger
 
 
@@ -133,8 +137,6 @@ def set_gpus():
     device = "cuda:{}".format(",".join([str(i) for i in gpu_index]))
     return device
 
-import cProfile
-import pstats
 
 
 def profile(filename: str = ''):
@@ -148,6 +150,8 @@ def profile(filename: str = ''):
 
     :param filename: string path to file where pstats.Stats will be saved
     '''
+    import cProfile
+    import pstats
 
     def wrap(func):
         def wrapped_f(*args, **kwargs):

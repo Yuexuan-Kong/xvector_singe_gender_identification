@@ -1,5 +1,5 @@
 """
-This file contains a very simple TDNN module to use for speaker-id.
+This file contains a very simple TDNN module to use for singer identification.
 
 To replace this model, change the `!new:` tag in the hyperparameter file
 to refer to a built-in SpeechBrain model or another file containing
@@ -68,7 +68,7 @@ class Xvector(torch.nn.Module):
         # and kernel sizes. We here loop over all the convolutional layers
         # that we wanna add. Note that batch normalization is used after
         # the activations function in this case. This improves the
-        # speaker-id performance a bit.
+        # singer identification performance a bit.
         for block_index in range(tdnn_blocks):
             out_channels = tdnn_channels[block_index]
             self.blocks.extend(
@@ -78,9 +78,9 @@ class Xvector(torch.nn.Module):
                         out_channels=out_channels,
                         kernel_size=tdnn_kernel_sizes[block_index],
                         dilation=tdnn_dilations[block_index],
-                    ).requires_grad_(block_index>3),
+                    ).requires_grad_(block_index>1),
                     activation(),
-                    BatchNorm1d(input_size=out_channels).requires_grad_(block_index>3),
+                    BatchNorm1d(input_size=out_channels).requires_grad_(block_index>1),
                 ]
             )
             in_channels = tdnn_channels[block_index]
@@ -149,7 +149,7 @@ class Classifier(sb.nnet.containers.Sequential):
         activation=torch.nn.LeakyReLU,
         lin_blocks=1,
         lin_neurons=512,
-        out_neurons=1211,
+        out_neurons=2,
     ):
         super().__init__(input_shape=input_shape)
 

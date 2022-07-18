@@ -26,6 +26,8 @@ Authors
 """
 import os
 import sys
+
+import numpy as np
 import torch
 import speechbrain as sb
 from hyperpyyaml import load_hyperpyyaml
@@ -39,7 +41,7 @@ from utils import *
 
 
 # Brain class for speech enhancement training
-class singer_idBrain(sb.Brain):
+class gender_rec_Brain(sb.Brain):
     # Class Brain is in the core.py
     def compute_forward(self, batch, stage):
         """Runs all the computation of that transforms the input into the
@@ -67,16 +69,17 @@ class singer_idBrain(sb.Brain):
 
         # Compute features, embeddings, and predictions, features are spectrograms, not mfcc
         feats, lens = self.prepare_features(batch.sig, stage)
-        # import pdbr;pdbr.set_trace()
         embeddings = self.modules.embedding_model(feats, lens)
         # embeddings.shape = torch.Size([32, 1, 512])
 
-        # save embedding for visualization
-        self.embeddings = torch.cat([self.embeddings, embeddings.squeeze()])
-
-        # save metadata also for visualization
-        self.metadata = torch.cat([self.metadata, batch.singer_id_encoded.data.squeeze()])
-
+        if stage == sb.Stage.TEST:
+            # save embedding for visualization
+            self.embeddings = torch.cat([self.embeddings, embeddings.squeeze()])
+            # save metadata also for visualization
+            gender_id = np.vstack((batch.gender_encoded.data.squeeze().cpu().detach().numpy(), np.array(batch.id))).T
+            import pdbr;pdbr.set_trace()
+            for item in gender_id.tolist():
+                self.metadata.append(item)
         predictions = self.modules.classifier(embeddings)
         # predictions.shape = torch.Size([32, 1, 28]) because of 28 singers
 
@@ -133,28 +136,26 @@ class singer_idBrain(sb.Brain):
         loss : torch.Tensor
             A one-element tensor used for back-propagating the gradient.
         """
-
         _, lens = batch.sig
-        singer_id, _ = batch.singer_id_encoded
+        gender, _ = batch.gender_encoded
 
         # Concatenate labels (due to data augmentation)
         if stage == sb.Stage.TRAIN and hasattr(self.modules, "env_corrupt"):
-            singer_id = torch.cat([singer_id, singer_id], dim=0)
+            gender = torch.cat([gender, gender], dim=0)
             lens = torch.cat([lens, lens])
 
         # Compute the cost function
-        loss = sb.nnet.losses.nll_loss(predictions, singer_id, lens)
+        loss = sb.nnet.losses.nll_loss(predictions, gender, lens)
 
         # Append this batch of losses to the loss metric for easy
         self.loss_metric.append(
-            batch.id, predictions, singer_id, lens, reduction="batch"
+            batch.id, predictions, gender, lens, reduction="batch"
         )
 
         # Compute classification error at test time
         if stage != sb.Stage.TRAIN:
-            self.error_metrics.append(batch.id, predictions, singer_id, lens)
-            # Print predictions and singer_id to see why always 34.9%
-            # import pdbr;pdbr.set_trace()
+            self.error_metrics.append(batch.id, predictions, gender, lens)
+            # Print predictions and gender to see why always 34.9%
 
         return loss
 
@@ -176,9 +177,11 @@ class singer_idBrain(sb.Brain):
         )
 
         # Set up trackers of output of the embedding model
-        self.embeddings = torch.Tensor().to(run_opts["device"])
-        self.metadata = torch.Tensor().to(run_opts["device"])
+        if stage == sb.Stage.TEST:
+            self.embeddings = torch.Tensor().to(run_opts["device"])
 
+            import numpy as np
+            self.metadata = []
         # Set up evaluation-only statistics trackers
         if stage != sb.Stage.TRAIN:
             self.error_metrics = self.hparams.error_stats()
@@ -223,7 +226,7 @@ class singer_idBrain(sb.Brain):
 
             self.hparams.tensorboard_train_logger.log_stats(
                 stats_meta={"Epoch": epoch},
-                train_stats=self.train_stats,
+                train_stats={"loss": self.train_loss},
                 valid_stats=stats,
             )
 
@@ -240,13 +243,9 @@ class singer_idBrain(sb.Brain):
             self.hparams.tensorboard_train_logger.writer.add_embedding(
                 self.embeddings,
                 metadata=self.metadata,
-                global_step=self.hparams.epoch_counter.current  # TODO
+                metadata_header=["gender", "song_id"],
+                global_step=self.hparams.epoch_counter.current
             )
-
-
-
-
-
 
 
 def dataio_prep(hparams):
@@ -288,17 +287,17 @@ def dataio_prep(hparams):
         return signal.data.squeeze()
 
     # Define label pipeline:
-    @sb.utils.data_pipeline.takes("singer_id")
-    @sb.utils.data_pipeline.provides("singer_id", "singer_id_encoded")
-    def label_pipeline(singer_id):
-        yield singer_id
-        singer_id_encoded = label_encoder.encode_label_torch(singer_id)
-        yield singer_id_encoded
+    @sb.utils.data_pipeline.takes("gender")
+    @sb.utils.data_pipeline.provides("gender", "gender_encoded")
+    def label_pipeline(gender):
+        yield gender
+        gender_encoded = label_encoder.encode_label_torch(gender)
+        yield gender_encoded
 
     # Define datasets. We also connect the dataset with the data processing
     # functions defined above.
     datasets = {}
-    hparams["dataloader_options"]["shuffle"] = False
+    hparams["dataloader_options"]["shuffle"] = True
     # we sort the dataset based on length to speed-up training because there will be less padding
     # It can also to shuffle the dataset
     for dataset in ["train", "valid", "test"]:
@@ -306,7 +305,7 @@ def dataio_prep(hparams):
             json_path=hparams[f"{dataset}_annotation"],
             replacements={"data_root": hparams["data_folder"]},
             dynamic_items=[audio_pipeline, label_pipeline],
-            output_keys=["id", "sig", "singer_id_encoded"],
+            output_keys=["id", "sig", "gender_encoded"],
         ).filtered_sorted(sort_key="length")
 
     # Load or compute the label encoder (with multi-GPU DDP support)
@@ -316,15 +315,16 @@ def dataio_prep(hparams):
     label_encoder.load_or_create(
         path=lab_enc_file,
         from_didatasets=[datasets["train"]],
-        output_key="singer_id",
+        # TODO change the output key
+        output_key="gender",
     )
     return datasets
 
 
 @profile(filename="profile.ps")
 def fit_func():
-    singer_id_brain.fit(
-        epoch_counter=singer_id_brain.hparams.epoch_counter,
+    gender_rec_brain.fit(
+        epoch_counter=gender_rec_brain.hparams.epoch_counter,
         train_set=datasets["train"],
         valid_set=datasets["valid"],
         train_loader_kwargs=hparams["dataloader_options"],
@@ -378,9 +378,10 @@ if __name__ == "__main__":
             "save_json_train": hparams["train_annotation"],
             "save_json_valid": hparams["valid_annotation"],
             "save_json_test": hparams["test_annotation"],
-            "split_ratio": [80, 10, 10],
-            "min_n_track": hparams["min_n_track"],
-            "max_n_track": hparams["max_n_track"]
+            "split_ratio": [90, 10],
+            "golden_path": hparams["golden_data"]
+            # "min_n_track": hparams["min_n_track"],
+            # "max_n_track": hparams["max_n_track"]
         },
     )
 
@@ -393,13 +394,14 @@ if __name__ == "__main__":
     hparams["pretrainer"].load_collected(device=run_opts["device"])
 
     # Initialize the Brain object to prepare for mask training.
-    singer_id_brain = singer_idBrain(
+    gender_rec_brain = gender_rec_Brain(
         modules=hparams["modules"],
         opt_class=hparams["opt_class"],
         hparams=hparams,
         run_opts=run_opts,
         checkpointer=hparams["checkpointer"],
     )
+    import pdbr;pdbr.set_trace()
 
     # The `fit()` method iterates the training loop, calling the methods
     # necessary to update the parameters of the model. Since all objects
@@ -412,7 +414,7 @@ if __name__ == "__main__":
     # fit_func()
 
     # Load the best checkpoint for evaluation
-    test_stats = singer_id_brain.evaluate(
+    test_stats = gender_rec_brain.evaluate(
         test_set=datasets["test"],
         min_key="error",
         test_loader_kwargs=hparams["dataloader_options"],
