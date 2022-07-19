@@ -1,0 +1,16 @@
+{
+  "381172321_origin_1": {
+    "wav": ".\/data\/origins\/381172321.wav",
+    "start": 17.7,
+    "end": 23.1,
+    "length": 5.4,
+    "gender": "woman"
+  },
+  "381172321_voice_1": {
+    "wav": ".\/data\/voices\/381172321\/vocals.wav",
+    "start": 10.5,
+    "end": 23.1,
+    "length": 12.6,
+    "gender": "woman"
+  }
+}
