@@ -1,9 +1,8 @@
 # #################################
-# Basic training parameters for speaker-id. We have first a network that
+# Basic training parameters for singer identification and gender recognition. 
+# We have first a network that
 # computes some embeddings. On the top of that, we employ a classifier.
-#
-# Author:
-#  * Mirco Ravanelli 2021
+
 # #################################
 
 # Seed needs to be set at top of yaml, before objects with parameters are made

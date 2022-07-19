@@ -1,13 +1,5 @@
-#!/usr/bin/env python3
-"""Recipe for training a speaker-id system. The template can use used as a
-basic example for any signal classification task such as language_id,
-emotion recognition, command classification, etc. The proposed task classifies
-28 speakers using Mini Librispeech. This task is very easy. In a real
-scenario, you need to use datasets with a larger number of speakers such as
-the voxceleb one (see recipes/VoxCeleb). Speechbrain has already some built-in
-models for signal classifications (see the ECAPA one in
-speechbrain.lobes.models.ECAPA_TDNN.py or the xvector in
-speechbrain/lobes/models/Xvector.py)
+"""
+Recipe for singer gender identification task.
 
 To run this recipe, do the following:
 > python train.py train.yaml
@@ -21,8 +13,6 @@ The first time you run it, this script should automatically download
 and prepare the Mini Librispeech dataset for computation. Noise and
 reverberation are automatically added to each sample from OpenRIR.
 
-Authors
- * Mirco Ravanelli 2021
 """
 import os
 import sys
