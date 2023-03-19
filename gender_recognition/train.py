@@ -2,7 +2,7 @@
 Recipe for singer gender identification task.
 
 To run this recipe, do the following:
-> python train.py train.yaml
+> python train.py train_1998.yaml
 
 To read the code, first scroll to the bottom to see the "main" code.
 This gives a high-level overview of what is going on, while the
@@ -20,14 +20,15 @@ import sys
 import numpy as np
 import torch
 import speechbrain as sb
+from utils import *
 from hyperpyyaml import load_hyperpyyaml
 from speechbrain.utils.distributed import ddp_init_group
 from speechbrain.utils.data_pipeline import provides
 from speechbrain.dataio import dataio, dataset
 from speechbrain.nnet import schedulers, losses
-from deezer.audio.signal import SignalFactory
 from prepare_data import prepare_json_files
-from utils import *
+from torch.utils.data import DataLoader
+from speechbrain.dataio.dataloader import LoopedLoader
 
 
 # Brain class for speech enhancement training
@@ -56,7 +57,6 @@ class gender_rec_Brain(sb.Brain):
 
         # We first move the batch to the appropriate device.
         batch = batch.to(self.device)
-
         # Compute features, embeddings, and predictions, features are spectrograms, not mfcc
         feats, lens = self.prepare_features(batch.sig, stage)
         embeddings = self.modules.embedding_model(feats, lens)
@@ -64,14 +64,12 @@ class gender_rec_Brain(sb.Brain):
 
         if stage == sb.Stage.TEST:
             # save embedding for visualization
-            self.embeddings = torch.cat([self.embeddings, embeddings.squeeze()])
+            self.embeddings = torch.cat([self.embeddings, embeddings.squeeze(1)])
             # save metadata also for visualization
             gender_id = np.vstack((batch.gender_encoded.data.squeeze().cpu().detach().numpy(), np.array(batch.id))).T
-            import pdbr;pdbr.set_trace()
             for item in gender_id.tolist():
                 self.metadata.append(item)
         predictions = self.modules.classifier(embeddings)
-        # predictions.shape = torch.Size([32, 1, 28]) because of 28 singers
 
         return predictions
 
@@ -92,12 +90,12 @@ class gender_rec_Brain(sb.Brain):
         # batch. This is more memory-demanding, but helps to improve the
         # performance. Change it if you run OOM.
         if stage == sb.Stage.TRAIN:
-            if hasattr(self.modules, "env_corrupt"):
-                # if this module has attribute env_corrupt, original waves and
-                # augmented ones are concatenated together
-                wavs_noise = self.modules.env_corrupt(wavs, lens)
-                wavs = torch.cat([wavs, wavs_noise], dim=0)
-                lens = torch.cat([lens, lens])
+            # if hasattr(self.modules, "env_corrupt"):
+            #     # if this module has attribute env_corrupt, original waves and
+            #     # augmented ones are concatenated together
+            #     wavs_noise = self.modules.env_corrupt(wavs, lens)
+            #     wavs = torch.cat([wavs, wavs_noise], dim=0)
+            #     lens = torch.cat([lens, lens])
 
             if hasattr(self.hparams, "augmentation"):
                 wavs = self.hparams.augmentation(wavs, lens)
@@ -129,10 +127,10 @@ class gender_rec_Brain(sb.Brain):
         _, lens = batch.sig
         gender, _ = batch.gender_encoded
 
-        # Concatenate labels (due to data augmentation)
-        if stage == sb.Stage.TRAIN and hasattr(self.modules, "env_corrupt"):
-            gender = torch.cat([gender, gender], dim=0)
-            lens = torch.cat([lens, lens])
+        # # Concatenate labels (due to data augmentation)
+        # if stage == sb.Stage.TRAIN and hasattr(self.modules, "env_corrupt"):
+        #     gender = torch.cat([gender, gender], dim=0)
+        #     lens = torch.cat([lens, lens])
 
         # Compute the cost function
         loss = sb.nnet.losses.nll_loss(predictions, gender, lens)
@@ -214,7 +212,7 @@ class gender_rec_Brain(sb.Brain):
                 valid_stats=stats,
             )
 
-            self.hparams.tensorboard_train_logger.log_stats(
+            self.hparams.tensorboard_valid_logger.log_stats(
                 stats_meta={"Epoch": epoch},
                 train_stats={"loss": self.train_loss},
                 valid_stats=stats,
@@ -224,18 +222,162 @@ class gender_rec_Brain(sb.Brain):
             self.checkpointer.save_and_keep_only(meta=stats, min_keys=["error"])
 
         # We also write statistics about test data to stdout and to the logfile.
-        if stage == sb.Stage.TEST:
+        if stage == sb.Stage.TEST and self.hparams.use_tensorboard:
+
             self.hparams.train_logger.log_stats(
                 {"Epoch loaded": self.hparams.epoch_counter.current},
                 test_stats=stats,
             )
 
-            self.hparams.tensorboard_train_logger.writer.add_embedding(
+            self.hparams.tensorboard_test_logger.writer.add_embedding(
                 self.embeddings,
                 metadata=self.metadata,
                 metadata_header=["gender", "song_id"],
                 global_step=self.hparams.epoch_counter.current
             )
+
+    def evaluate(
+            self,
+            test_set,
+            max_key=None,
+            min_key=None,
+            progressbar=None,
+            test_loader_kwargs={},
+    ):
+        """Iterate test_set and evaluate brain performance. By default, loads
+        the best-performing checkpoint (as recorded using the checkpointer).
+
+        On top of the default evaluate function, I added a bloc of code to save the
+        wrong predictions.
+
+        Arguments
+        ---------
+        test_set : Dataset, DataLoader
+            If a DataLoader is given, it is iterated directly. Otherwise passed
+            to ``self.make_dataloader()``.
+        max_key : str
+            Key to use for finding best checkpoint, passed to
+            ``on_evaluate_start()``.
+        min_key : str
+            Key to use for finding best checkpoint, passed to
+            ``on_evaluate_start()``.
+        progressbar : bool
+            Whether to display the progress in a progressbar.
+        test_loader_kwargs : dict
+            Kwargs passed to ``make_dataloader()`` if ``test_set`` is not a
+            DataLoader. NOTE: ``loader_kwargs["ckpt_prefix"]`` gets
+            automatically overwritten to ``None`` (so that the test DataLoader
+            is not added to the checkpointer).
+
+        Returns
+        -------
+        average test loss
+        """
+        if progressbar is None:
+            progressbar = not self.noprogressbar
+
+        if not (
+                isinstance(test_set, DataLoader)
+                or isinstance(test_set, LoopedLoader)
+        ):
+            test_loader_kwargs["ckpt_prefix"] = None
+            test_loader_kwargs["shuffle"] = False
+            test_set = self.make_dataloader(
+                test_set, sb.Stage.TEST, **test_loader_kwargs
+            )
+
+        # Now we iterate over the dataset and we simply compute_forward and decode
+        wrong_ids = []
+        avg_test_loss = 0.0
+
+        self.on_evaluate_start(max_key=max_key, min_key=min_key)
+        self.on_stage_start(sb.Stage.TEST, epoch=None)
+        self.modules.eval()
+
+        from tqdm import tqdm
+        with torch.no_grad():
+            for batch in tqdm(
+                    test_set, dynamic_ncols=True, disable=not progressbar
+            ):
+                self.step += 1
+
+                # calculate preditions from probablities and wrong predictions
+                probabilities = self.compute_forward(batch, stage=sb.Stage.TEST)
+                prediction_batch = torch.argmax(probabilities, dim=-1).squeeze().cpu().detach().numpy()
+                label = batch.gender_encoded.data.squeeze().cpu().detach().numpy()
+                id = np.array(batch.id)
+
+                # ID of wrong predictions
+                wrong_id = id[prediction_batch!=label]
+                wrong_ids.extend(wrong_id.tolist())
+
+                # Calculate loss of the test dataset
+                loss = self.compute_objectives(probabilities, batch, stage=sb.Stage.TEST).detach().cpu()
+                avg_test_loss = self.update_average(loss, avg_test_loss)
+
+                # Profile only if desired (steps allow the profiler to know when all is warmed up)
+                if self.profiler is not None:
+                    if self.profiler.record_steps:
+                        self.profiler.step()
+
+                # Debug mode only runs a few batches
+                if self.debug and self.step == self.debug_batches:
+                    break
+
+            from speechbrain.utils.distributed import run_on_main
+            # Only run evaluation "on_stage_end" on main process
+            run_on_main(
+                self.on_stage_end, args=[sb.Stage.TEST, avg_test_loss, None]
+            )
+        self.step = 0
+
+        # save wrong ids to a local pickle file
+        import pickle
+        with open('wrong_predictions.pkl', 'wb') as f:
+            pickle.dump(wrong_ids, f)
+        print(len(wrong_ids), avg_test_loss)
+        return wrong_ids, avg_test_loss
+    # TODO: change inference dataset to json file, simplify the inference process
+    
+    def inference(
+            self,
+            dataset,  # Must be obtained from the dataio_function
+            min_key,  # We load the model with the lowest key
+            loader_kwargs  # opts for the dataloading
+    ):
+
+        self.on_evaluate_start(min_key)
+        self.on_stage_start(sb.Stage.TEST)  # We call the on_evaluate_start that will load the best model
+        self.modules.eval()  # We set the model to eval mode (remove dropout etc)
+
+        if not (
+            isinstance(dataset, DataLoader)
+            or isinstance(dataset, LoopedLoader)
+        ):
+            loader_kwargs["ckpt_prefix"] = None
+            dataset = self.make_dataloader(
+                dataset, sb.Stage.TEST, **loader_kwargs
+            )
+
+        # Now we iterate over the dataset and we simply compute_forward and decode
+        with torch.no_grad():
+            from tqdm import tqdm
+            predictions = []
+            ids = []
+            for batch in tqdm(dataset, dynamic_ncols=True):
+                # Make sure that your compute_forward returns the predictions !!!
+                # In the case of the template, when stage = TEST, a beam search is applied
+                # in compute_forward().
+                probabilities = self.compute_forward(batch, stage=sb.Stage.TEST)
+                import pdbr;pdbr.set_trace()
+                prediction_batch = torch.argmax(probabilities, dim=-1).squeeze().cpu().detach().numpy()
+                label = batch.gender_encoded.data.squeeze().cpu().detach().numpy()
+                id = np.array(batch.id)
+
+                predictions.append(prediction_batch.tolist())
+                ids.append(id.tolist())
+
+        return ids, predictions
 
 
 def dataio_prep(hparams):
@@ -248,7 +390,7 @@ def dataio_prep(hparams):
     Arguments
     ---------
     hparams : dict
-        This dictionary is loaded from the `train.yaml` file, and it includes
+        This dictionary is loaded from the `train_1998.yaml` file, and it includes
         all the hyperparameters needed for dataset construction and loading.
 
     Returns
@@ -296,8 +438,15 @@ def dataio_prep(hparams):
             replacements={"data_root": hparams["data_folder"]},
             dynamic_items=[audio_pipeline, label_pipeline],
             output_keys=["id", "sig", "gender_encoded"],
-        ).filtered_sorted(sort_key="length")
+        )
 
+    # for dataset in ["subset_0.json", "subset_1.json", "subset_2.json", "subset_3.json", "subset_4.json"]:
+    #     datasets[dataset] = sb.dataio.dataset.DynamicItemDataset.from_json(
+    #         json_path=hparams["test_bootstrap"]+dataset,
+    #         replacements={"data_root": hparams["data_folder"]},
+    #         dynamic_items=[audio_pipeline, label_pipeline],
+    #         output_keys=["id", "sig", "gender_encoded"],
+    #     )
     # Load or compute the label encoder (with multi-GPU DDP support)
     # Please, take a look into the lab_enc_file to see the label to index
     # mapping.
@@ -305,13 +454,12 @@ def dataio_prep(hparams):
     label_encoder.load_or_create(
         path=lab_enc_file,
         from_didatasets=[datasets["train"]],
-        # TODO change the output key
         output_key="gender",
     )
     return datasets
 
 
-@profile(filename="profile.ps")
+# @profile(filename="profile.ps")
 def fit_func():
     gender_rec_brain.fit(
         epoch_counter=gender_rec_brain.hparams.epoch_counter,
@@ -327,21 +475,27 @@ if __name__ == "__main__":
 
     # Reading command line arguments.
     hparams_file, run_opts, overrides = sb.parse_arguments(sys.argv[1:])
-    run_opts["device"] = set_gpus()
+
+    os.environ['KMP_DUPLICATE_LIB_OK']='True'  
     run_opts["debug"] = False
 
     # Initialize ddp (useful only for multi-GPU DDP training).
     sb.utils.distributed.ddp_init_group(run_opts)
 
-    # Load hyperparameters file with command-line overrides.
+    # Load hyperparameters file with command-line overrides. Have to change directory before it, because it calls
+    # downloading if data we need is not in the right directory
+
     with open(hparams_file) as fin:
         hparams = load_hyperpyyaml(fin, overrides)
+
+    # change work dir to the parent folder
+    run_opts["device"] = set_gpus()
+
     # This function will download files needed for augmentation and put them under ./data
     # corresponding function is here: speechbrain.lobes.augment.EnvCorrupt
-
     # Create experiment directory
-    # This function puts train.py, train.yaml, env and log in a subdirectory that has the same name as seed
-    # which is defined in train.yaml: output_folder: !ref ./results/speaker_id/<seed>
+    # This function puts train.py, train_1998.yaml, env and log in a subdirectory that has the same name as seed
+    # which is defined in train_1998.yaml: output_folder: !ref ./results/speaker_id/<seed>
     # All the experiment will happen there
     sb.create_experiment_directory(
         experiment_directory=hparams["output_folder"],
@@ -353,8 +507,12 @@ if __name__ == "__main__":
     if hparams["use_tensorboard"]:
         from utils import MyTensorboardLogger as TensorboardLogger
 
-        hparams["tensorboard_train_logger"] = TensorboardLogger(
-            hparams["tensorboard_logs_folder"]
+        hparams["tensorboard_valid_logger"] = TensorboardLogger(
+            hparams["tensorboard_logs_valid_folder"]
+        )
+
+        hparams["tensorboard_test_logger"] = TensorboardLogger(
+            hparams["tensorboard_logs_test_folder"]
         )
 
     # Data preparation, to be run on only one process.
@@ -370,15 +528,13 @@ if __name__ == "__main__":
             "save_json_test": hparams["test_annotation"],
             "split_ratio": [90, 10],
             "golden_path": hparams["golden_data"]
-            # "min_n_track": hparams["min_n_track"],
-            # "max_n_track": hparams["max_n_track"]
         },
     )
 
-    # Create dataset objects "train", "valid", and "test".
+    # # Create dataset objects "train", "valid", and "test".
     # Load dataset in objects
     datasets = dataio_prep(hparams)
-
+    #
     # Fetch and load pretrained modules
     sb.utils.distributed.run_on_main(hparams["pretrainer"].collect_files)
     hparams["pretrainer"].load_collected(device=run_opts["device"])
@@ -391,8 +547,6 @@ if __name__ == "__main__":
         run_opts=run_opts,
         checkpointer=hparams["checkpointer"],
     )
-    import pdbr;pdbr.set_trace()
-
     # The `fit()` method iterates the training loop, calling the methods
     # necessary to update the parameters of the model. Since all objects
     # with changing state are managed by the Checkpointer, training can be
@@ -400,8 +554,8 @@ if __name__ == "__main__":
 
     # Speechbrain.utils.checkpoints - Would load a checkpoint here, but none found yet.
     # fit() function is from Brain class, I can pass dataloader shuffle in train_loader_kwargs, which is saved in
-    # train.yaml
-    # fit_func()
+    # train_1998.yaml
+    fit_func()
 
     # Load the best checkpoint for evaluation
     test_stats = gender_rec_brain.evaluate(
@@ -409,3 +563,10 @@ if __name__ == "__main__":
         min_key="error",
         test_loader_kwargs=hparams["dataloader_options"],
     )
+
+    # for i in ["subset_0.json", "subset_1.json", "subset_2.json", "subset_3.json", "subset_4.json"]:
+    #     bootstrap_test_stats = gender_rec_brain.evaluate(
+    #         test_set=datasets[i],
+    #         min_key="error",
+    #         test_loader_kwargs=hparams["dataloader_options"],
+    #     )

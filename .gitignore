@@ -2,3 +2,11 @@ tb_logs/
 training_sid.csv
 .idea/
 download_to_local/.idea/
+/data/
+/download_to_local/
+/json_internship/
+/instrumental_female_male/
+/inference/
+/gender_recognition_whole_seg/
+/gender_recognition_internship/
+/download_to_local/
