@@ -19,6 +19,7 @@ import sys
 
 import numpy as np
 import torch
+import torchaudio
 import speechbrain as sb
 
 import utils
