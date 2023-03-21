@@ -194,7 +194,6 @@ class gender_rec_Brain(sb.Brain):
         # Store the train loss until the validation stage.
         if stage == sb.Stage.TRAIN:
             self.train_loss = stage_loss
-            torch.cuda.empty_cache()
 
         # Summarize the statistics from the stage for record-keeping.
         else:
@@ -239,6 +238,7 @@ class gender_rec_Brain(sb.Brain):
                 metadata_header=["gender", "song_id"],
                 global_step=self.hparams.epoch_counter.current
             )
+        torch.cuda.empty_cache()
 
     def evaluate(
             self,
