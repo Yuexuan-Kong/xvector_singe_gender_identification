@@ -20,6 +20,8 @@ import sys
 import numpy as np
 import torch
 import speechbrain as sb
+
+import utils
 from utils import *
 from hyperpyyaml import load_hyperpyyaml
 from speechbrain.utils.distributed import ddp_init_group
@@ -413,10 +415,8 @@ def dataio_prep(hparams):
         This is done on the CPU in the `collate_fn`.
         It resamples the signal if the sampling rate is not the same as in the hyperparameter file.
         """
-        signal = SignalFactory().load(
-            wav, sampling_frequency=hparams["sample_rate"], offset=start, duration=end-start
-        ).to_mono(inplace=True)
-        return signal.data.squeeze()
+        signal = utils.read(wav, start, end)
+        return signal[1]
 
     # Define label pipeline:
     @sb.utils.data_pipeline.takes("gender")
@@ -489,7 +489,7 @@ if __name__ == "__main__":
         hparams = load_hyperpyyaml(fin, overrides)
 
     # change work dir to the parent folder
-    run_opts["device"] = set_gpus()
+    run_opts["device"] = "cpu"
 
     # This function will download files needed for augmentation and put them under ./data
     # corresponding function is here: speechbrain.lobes.augment.EnvCorrupt

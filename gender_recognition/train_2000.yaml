@@ -37,7 +37,6 @@ tensorboard_logs_test_folder: !ref <output_folder>/tb_logs_embedding_test/
 train_annotation: !ref train.json
 valid_annotation: !ref test.json
 test_annotation: !ref test.json
-test_bootstrap: ../data/test_2classes_bootstrap/
 
 # The train logger writes training statistics to a file, as well as stdout.
 train_logger: !new:speechbrain.utils.train_logger.FileTrainLogger
@@ -60,10 +59,10 @@ lr_start: 0.001
 lr_final: 0.0001
 # TODO change number of classes
 n_classes: 2
-emb_dim: 512 # dimensionality of the embeddings
+emb_dim: 128 # dimensionality of the embeddings
 dataloader_options:
     batch_size: !ref <batch_size>
-    num_workers: 18
+    num_workers: 1
 
 
 # Added noise and reverb come from OpenRIR dataset, automatically

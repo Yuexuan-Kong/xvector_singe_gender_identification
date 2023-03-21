@@ -10,3 +10,9 @@ download_to_local/.idea/
 /gender_recognition_whole_seg/
 /gender_recognition_internship/
 /download_to_local/
+/data_to_transfer
+/ffmpeg-batch-audio-resampler/
+/.DS_Store
+/gender_recognition/.DS_Store
+/gender_recognition/__pycache__/prepare_data.cpython-39.pyc
+

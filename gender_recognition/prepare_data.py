@@ -322,7 +322,7 @@ def create_json_1200(df, json_file, test_folder):
             gender = "man" if int(row["gender"])==1 else "woman"
 
             # Select the whole segment, so that we are sure there's singing voice
-            path = test_folder+row["song_name"]+"_"+str(i)+".mp3"
+            path = test_folder+row["song_name"]+"_"+str(i)+".wav"
 
             json_dict[row["song_name"]+"_"+str(i)] = {
                 "wav": path,
@@ -376,7 +376,7 @@ def create_json_new_training(df, json_file, add_spleeter, chunk_length, original
         for i in range(0, int(round(duration/10)*gender)):
 
             # Random select segment that are larger than 3s and 10s
-            path = original_folder+str(row["SNG_ID"])+".mp3"
+            path = original_folder+str(row["SNG_ID"])+".wav"
             start = round(random.uniform(0, duration-min_c), 1)
             end = round(random.uniform(start+min_c, min(start+max_c, duration)), 1)
 
@@ -391,7 +391,7 @@ def create_json_new_training(df, json_file, add_spleeter, chunk_length, original
             if add_spleeter:
                 start = round(random.uniform(0, duration-min_c), 1)
                 end = round(random.uniform(start+min_c, min(start+max_c, duration)), 1)
-                path = voice_folder+str(row["SNG_ID"]) + "/" +"vocals.mp3"
+                path = voice_folder+str(row["SNG_ID"])+".wav"
 
                 json_dict[str(row["SNG_ID"])+f"_voice_{i+1}"] = {
                     "wav": path,
@@ -447,6 +447,6 @@ def create_json_whole_segment(df, json_file, original_folder):
 
 if __name__ == "__main__":
     df_test = pd.read_csv("../data/test_annotation.csv", sep=";")
-    #create_json_1200(df_test, "test_annotation", "1200_segments/")
+    create_json_1200(df_test, "test.json", "1200_segments/")
     df_train = pd.read_csv("../data/train_exclude_unique.csv")
-    create_json_new_training(df_train, "train_annotation", True, [3,3], "origins/", "voices/")
+    create_json_new_training(df_train, "train.json", True, [3,3], "origins/", "voices/")
