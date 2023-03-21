@@ -415,7 +415,7 @@ def dataio_prep(hparams):
         This is done on the CPU in the `collate_fn`.
         It resamples the signal if the sampling rate is not the same as in the hyperparameter file.
         """
-        signal = utils.read(wav, start, end)
+        signal = utils.read(wav, start, end-start)
         return signal[1]
 
     # Define label pipeline:

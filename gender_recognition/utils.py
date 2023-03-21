@@ -3,6 +3,8 @@ This file contains some functions for data preparing and tensorboard loggers.
 """
 
 from speechbrain.utils.train_logger import TrainLogger
+import pydub
+import numpy as np
 
 
 def choose_track_number(df, n_min, n_max=10000):
@@ -136,6 +138,18 @@ def set_gpus():
     logging.info("\t Using GPUs: {}".format(gpu_index))
     device = "cuda:{}".format(",".join([str(i) for i in gpu_index]))
     return device
+
+
+def read(f, start, duration, normalized=False):
+    """MP3 to numpy array"""
+    a = pydub.AudioSegment.from_wav(f, start, duration)
+    y = np.array(a.get_array_of_samples())
+    if a.channels == 2:
+        y = y.mean(axis=1)
+    if normalized:
+        return a.frame_rate, np.float32(y) / 2**15
+    else:
+        return a.frame_rate, y
 
 
 
