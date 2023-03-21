@@ -447,6 +447,6 @@ def create_json_whole_segment(df, json_file, original_folder):
 
 if __name__ == "__main__":
     df_test = pd.read_csv("../data/test_annotation.csv", sep=";")
-    create_json_1200(df_test, "test.json", "1200_segments/")
+    create_json_1200(df_test, "test.json", "../data/1200_segments/")
     df_train = pd.read_csv("../data/train_exclude_unique.csv")
-    create_json_new_training(df_train, "train.json", True, [3,3], "origins/", "voices/")
+    create_json_new_training(df_train, "train.json", True, [3,3], "../data/origins/", "../data/voices/")
