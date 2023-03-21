@@ -142,7 +142,7 @@ def set_gpus():
 
 def read(f, start, duration, normalized=False):
     """MP3 to numpy array"""
-    a = pydub.AudioSegment.from_wav(f, start_second=start, duration=duration)
+    a = pydub.AudioSegment.from_file(f, start_second=start, duration=duration)
     y = np.array(a.get_array_of_samples())
     if a.channels == 2:
         y = y.mean(axis=1)
