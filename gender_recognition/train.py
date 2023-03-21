@@ -415,8 +415,11 @@ def dataio_prep(hparams):
         This is done on the CPU in the `collate_fn`.
         It resamples the signal if the sampling rate is not the same as in the hyperparameter file.
         """
-        signal = utils.read(wav, start, end-start)
-        return signal[1]
+        sig, read_sr = torchaudio.load(wave_file, start=16000*start, end=16000*end)
+
+        # If multi-channels, downmix it to a mono channel
+        sig = torch.squeeze(sig)
+        return sig
 
     # Define label pipeline:
     @sb.utils.data_pipeline.takes("gender")
