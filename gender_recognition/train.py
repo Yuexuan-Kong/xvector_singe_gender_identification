@@ -215,29 +215,30 @@ class gender_rec_Brain(sb.Brain):
                 valid_stats=stats,
             )
 
-            self.hparams.tensorboard_valid_logger.log_stats(
-                stats_meta={"Epoch": epoch},
-                train_stats={"loss": self.train_loss},
-                valid_stats=stats,
-            )
+            if self.hparams.use_tensorboard:
+                self.hparams.tensorboard_valid_logger.log_stats(
+                    stats_meta={"Epoch": epoch},
+                    train_stats={"loss": self.train_loss},
+                    valid_stats=stats,
+                )
 
             # Save the current checkpoint and delete previous checkpoints,
             self.checkpointer.save_and_keep_only(meta=stats, min_keys=["error"])
 
         # We also write statistics about test data to stdout and to the logfile.
-        if stage == sb.Stage.TEST and self.hparams.use_tensorboard:
+        if stage == sb.Stage.TEST :
 
             self.hparams.train_logger.log_stats(
                 {"Epoch loaded": self.hparams.epoch_counter.current},
                 test_stats=stats,
             )
-
-            self.hparams.tensorboard_test_logger.writer.add_embedding(
-                self.embeddings,
-                metadata=self.metadata,
-                metadata_header=["gender", "song_id"],
-                global_step=self.hparams.epoch_counter.current
-            )
+            if self.hparams.use_tensorboard:
+                self.hparams.tensorboard_test_logger.writer.add_embedding(
+                    self.embeddings,
+                    metadata=self.metadata,
+                    metadata_header=["gender", "song_id"],
+                    global_step=self.hparams.epoch_counter.current
+                )
         torch.cuda.empty_cache()
 
     def evaluate(
@@ -495,6 +496,10 @@ if __name__ == "__main__":
 
     # change work dir to the parent folder
     run_opts["device"] ="cuda:0"
+    # run_opts["device"] = "cpu"
+    # run_opts["debug"] = True
+    # run_opts["debug_batches"] = 1
+    # run_opts["debug_epochs"] = 2
 
     # This function will download files needed for augmentation and put them under ./data
     # corresponding function is here: speechbrain.lobes.augment.EnvCorrupt
