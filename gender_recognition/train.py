@@ -418,7 +418,7 @@ def dataio_prep(hparams):
         This is done on the CPU in the `collate_fn`.
         It resamples the signal if the sampling rate is not the same as in the hyperparameter file.
         """
-        sig, read_sr = torchaudio.load(wav, frame_offset=int(16000*start), num_frames=int(16000*end))
+        sig, read_sr = torchaudio.load(wav, frame_offset=int(16000*start), num_frames=int(16000*3))
 
         # If multi-channels, downmix it to a mono channel
         sig = torch.squeeze(sig)
@@ -500,6 +500,7 @@ if __name__ == "__main__":
     # run_opts["debug_batches"] = 1
     # run_opts["debug_epochs"] = 2
     hparams["dataloader_options"]["shuffle"] = True
+
     # This function will download files needed for augmentation and put them under ./data
     # corresponding function is here: speechbrain.lobes.augment.EnvCorrupt
     # Create experiment directory

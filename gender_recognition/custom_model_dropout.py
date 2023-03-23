@@ -89,9 +89,9 @@ class Xvector(torch.nn.Module):
             )
         )
 
-        self.blocks.append(
-            Dropout2d(drop_rate=0.3)
-        )
+        # self.blocks.append(
+        #     Dropout2d(drop_rate=0.3)
+        # )
 
 
     def forward(self, x, lens=None):
@@ -184,5 +184,5 @@ class Classifier(sb.nnet.containers.Sequential):
             sb.nnet.activations.Softmax(apply_log=True), layer_name="softmax"
         )
         self.append(
-            Dropout2d(drop_rate=0.3)
+            Dropout2d(drop_rate=0.15)
         )
