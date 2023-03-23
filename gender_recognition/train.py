@@ -435,7 +435,6 @@ def dataio_prep(hparams):
     # Define datasets. We also connect the dataset with the data processing
     # functions defined above.
     datasets = {}
-    hparams["dataloader_options"]["shuffle"] = True
     # we sort the dataset based on length to speed-up training because there will be less padding
     # It can also to shuffle the dataset
     for dataset in ["train", "valid", "test"]:

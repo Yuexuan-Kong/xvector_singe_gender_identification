@@ -55,23 +55,24 @@ n_mels: 24
 sample_rate: 16000
 number_of_epochs: 20
 batch_size: 16
-lr_start: 0.001
-lr_final: 0.0001
+lr_start: 0.005 #0.001
+lr_final: 0.0005 #0.0001
 # TODO change number of classes
 n_classes: 2
 emb_dim: 128 # dimensionality of the embeddings
 dataloader_options:
     batch_size: !ref <batch_size>
     num_workers: 16
+    shuffle: True
 
 
 # Added noise and reverb come from OpenRIR dataset, automatically
 # downloaded and prepared with this Environmental Corruption class.
 env_corrupt: !new:speechbrain.lobes.augment.EnvCorrupt
     openrir_folder: !ref <data_folder>
-    babble_prob: 0.0
+    babble_prob: 0.3
     reverb_prob: 0.5
-    noise_prob: 0.0
+    noise_prob: 0.2
     noise_snr_low: 0
     noise_snr_high: 15
     rir_scale_factor: 1.0
@@ -94,7 +95,7 @@ mean_var_norm: !new:speechbrain.processing.features.InputNormalization
 # To design a custom model, either just edit the simple CustomModel
 # class that's listed here, or replace this `!new` call with a line
 # pointing to a different file you've defined.
-embedding_model: !new:custom_model.Xvector
+embedding_model: !new:custom_model_dropout.Xvector
     in_channels: !ref <n_mels>
     activation: !name:torch.nn.LeakyReLU
     tdnn_blocks: 5
@@ -104,7 +105,7 @@ embedding_model: !new:custom_model.Xvector
     lin_neurons: !ref <emb_dim>
     # only the embedding model should use the pretrained one.
 
-classifier: !new:custom_model.Classifier
+classifier: !new:custom_model_dropout.Classifier
     input_shape: [null, null, !ref <emb_dim>]
     activation: !name:torch.nn.LeakyReLU
     lin_blocks: 1

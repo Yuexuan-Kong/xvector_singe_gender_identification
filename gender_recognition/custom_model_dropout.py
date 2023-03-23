@@ -89,6 +89,11 @@ class Xvector(torch.nn.Module):
             )
         )
 
+        self.blocks.append(
+            Dropout2d(drop_rate=0.3)
+        )
+
+
     def forward(self, x, lens=None):
         """Returns the x-vectors.
 
