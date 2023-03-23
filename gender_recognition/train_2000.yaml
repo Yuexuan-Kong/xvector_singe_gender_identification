@@ -95,7 +95,7 @@ mean_var_norm: !new:speechbrain.processing.features.InputNormalization
 # To design a custom model, either just edit the simple CustomModel
 # class that's listed here, or replace this `!new` call with a line
 # pointing to a different file you've defined.
-embedding_model: !new:custom_model_dropout.Xvector
+embedding_model: !new:custom_model.Xvector
     in_channels: !ref <n_mels>
     activation: !name:torch.nn.LeakyReLU
     tdnn_blocks: 5
@@ -105,7 +105,7 @@ embedding_model: !new:custom_model_dropout.Xvector
     lin_neurons: !ref <emb_dim>
     # only the embedding model should use the pretrained one.
 
-classifier: !new:custom_model_dropout.Classifier
+classifier: !new:custom_model.Classifier
     input_shape: [null, null, !ref <emb_dim>]
     activation: !name:torch.nn.LeakyReLU
     lin_blocks: 1
