@@ -499,7 +499,7 @@ if __name__ == "__main__":
     # run_opts["debug"] = True
     # run_opts["debug_batches"] = 1
     # run_opts["debug_epochs"] = 2
-
+    hparams["dataloader_options"]["shuffle"] = True
     # This function will download files needed for augmentation and put them under ./data
     # corresponding function is here: speechbrain.lobes.augment.EnvCorrupt
     # Create experiment directory
