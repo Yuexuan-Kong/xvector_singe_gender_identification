@@ -59,7 +59,7 @@ lr_start: 0.005 #0.001
 lr_final: 0.001 #0.0001
 # TODO change number of classes
 n_classes: 2
-emb_dim: 64 # dimensionality of the embeddings
+emb_dim: 128 # dimensionality of the embeddings
 dataloader_options:
     batch_size: !ref <batch_size>
     num_workers: 16
@@ -70,7 +70,7 @@ dataloader_options:
 # downloaded and prepared with this Environmental Corruption class.
 env_corrupt: !new:speechbrain.lobes.augment.EnvCorrupt
     openrir_folder: !ref <data_folder>
-    babble_prob: 0.0
+    babble_prob: 0.3
     reverb_prob: 0.5
     noise_prob: 0.2
     noise_snr_low: 0
@@ -81,7 +81,7 @@ env_corrupt: !new:speechbrain.lobes.augment.EnvCorrupt
 # # A small speed change help to improve the performance of speaker-id as well.
 augmentation: !new:speechbrain.lobes.augment.TimeDomainSpecAugment
     sample_rate: !ref <sample_rate>
-    speeds: [90, 100, 110]
+    speeds: [95, 100, 105]
 
 # Feature extraction
 compute_features: !new:speechbrain.lobes.features.Fbank

@@ -172,7 +172,7 @@ class Classifier(sb.nnet.containers.Sequential):
                 sb.nnet.normalization.BatchNorm1d, layer_name="norm"
             )
             self.DNN[block_name].append(
-                Dropout2d(drop_rate=0.3)
+                Dropout2d(drop_rate=0.1)
             )
 
         # Final Softmax classifier
