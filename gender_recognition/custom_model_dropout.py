@@ -90,7 +90,7 @@ class Xvector(torch.nn.Module):
         )
 
         self.blocks.append(
-            Dropout2d(drop_rate=0.3)
+            Dropout2d(drop_rate=0.1)
         )
 
 
