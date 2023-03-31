@@ -171,9 +171,9 @@ class Classifier(sb.nnet.containers.Sequential):
             self.DNN[block_name].append(
                 sb.nnet.normalization.BatchNorm1d, layer_name="norm"
             )
-            self.DNN[block_name].append(
-                Dropout2d(drop_rate=0.1)
-            )
+            # self.DNN[block_name].append(
+            #     Dropout2d(drop_rate=0.1)
+            # )
 
         # Final Softmax classifier
         # Add these after all the DNN layers

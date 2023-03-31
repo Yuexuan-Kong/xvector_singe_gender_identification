@@ -374,7 +374,7 @@ class gender_rec_Brain(sb.Brain):
                 # In the case of the template, when stage = TEST, a beam search is applied
                 # in compute_forward().
                 probabilities = self.compute_forward(batch, stage=sb.Stage.TEST)
-                import pdbr;pdbr.set_trace()
+                # Difference between probabilities define the uncertainty
                 prediction_batch = torch.argmax(probabilities, dim=-1).squeeze().cpu().detach().numpy()
                 label = batch.gender_encoded.data.squeeze().cpu().detach().numpy()
                 id = np.array(batch.id)
