@@ -31,7 +31,7 @@ from speechbrain.utils.distributed import ddp_init_group
 from speechbrain.utils.data_pipeline import provides
 from speechbrain.dataio import dataio, dataset
 from speechbrain.nnet import schedulers, losses
-from prepare_data import prepare_json_files
+from prepare_data import prepare_json_files, random
 from torch.utils.data import DataLoader
 from speechbrain.dataio.dataloader import LoopedLoader
 
@@ -205,6 +205,7 @@ class gender_rec_Brain(sb.Brain):
                 "loss": stage_loss,
                 "error": self.error_metrics.summarize("average"),
             }
+            wandb.log({'validation_error', stats['error']})
 
         # At the end of validation...
         if stage == sb.Stage.VALID:
@@ -501,6 +502,9 @@ def main():
     # Load hyperparameters file with command-line overrides. Have to change directory before it, because it calls
     # downloading if data we need is not in the right directory
     overrides = wandb.config
+    overrides.update({'seed': random.randint(0, 10000)})
+    print(f"Setting seed to: {overrides['seed']}")
+    wandb.log({'seed': overrides['seed']})
     with open(hparams_file) as fin:
         hparams = load_hyperpyyaml(fin, overrides)
 
@@ -509,6 +513,7 @@ def main():
     hparams['batch_size'] = wandb.config.batch_size
     hparams['lr_start'] = wandb.config.lr_start
     hparams['lr_final'] = wandb.config.lr_final
+    hparams['emb_dim'] = wandb.config.emb_dim
 
     # change work dir to the parent folder
     run_opts["device"] ="cuda:0"
@@ -574,6 +579,7 @@ def main():
         run_opts=run_opts,
         checkpointer=hparams["checkpointer"],
     )
+    wandb.watch(gender_rec_brain.modules.embedding_model)
     # The `fit()` method iterates the training loop, calling the methods
     # necessary to update the parameters of the model. Since all objects
     # with changing state are managed by the Checkpointer, training can be
@@ -607,13 +613,14 @@ if __name__ == "__main__":
             'goal': 'minimize',
             # Note for baobao:
             # The name of this variable MUST match the name of a key going into 'wandb.log'
-            'name': 'validation_loss'
+            'name': 'validation_error'
         },
         'parameters':
         {
             'batch_size': {'values': [8, 16, 32]},
             'lr_start': {'values': [0.015, 0.01, 0.05]},
-            'lr_final': {'values': [0.0015, 0.01, 0.0001]},
+            'lr_final': {'values': [0.0015, 0.001, 0.0001]},
+            'emb_dim': {'values': [32, 64, 128]},
          }
     }
     sweep_id = wandb.sweep(sweep=sweep_configuration, project='ISMIR-2023')
