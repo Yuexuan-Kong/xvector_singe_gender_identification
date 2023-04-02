@@ -54,10 +54,12 @@ n_mels: 24
 # Training Parameters
 sample_rate: 16000
 number_of_epochs: 20
-batch_size: 16
-lr_start: 0.005 #0.001
-lr_final: 0.001 #0.0001
-# TODO change number of classes
+# Note for baobao:
+# These values are taken care of inside function 'train.py:setup_wandb_sweep()'
+batch_size: false  # To be set by wandb
+lr_start: false  # To be set by wandb
+lr_final: false  # To be set by wandb
+  #TODO change number of classes
 n_classes: 2
 emb_dim: 128 # dimensionality of the embeddings
 dataloader_options:
