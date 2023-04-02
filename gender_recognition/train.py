@@ -197,6 +197,7 @@ class gender_rec_Brain(sb.Brain):
         # Store the train loss until the validation stage.
         if stage == sb.Stage.TRAIN:
             self.train_loss = stage_loss
+            wandb.log({"training_loss": stage_loss})
 
         # Summarize the statistics from the stage for record-keeping.
         else:
@@ -491,7 +492,7 @@ def main():
     # Reading command line arguments.
     global run_opts  # Makes run_opts global
     hparams_file, run_opts, overrides = sb.parse_arguments(sys.argv[1:])
-    os.environ['KMP_DUPLICATE_LIB_OK']='True'  
+    os.environ['KMP_DUPLICATE_LIB_OK']='True'
     run_opts["debug"] = False
 
     # Initialize ddp (useful only for multi-GPU DDP training).
@@ -499,13 +500,12 @@ def main():
 
     # Load hyperparameters file with command-line overrides. Have to change directory before it, because it calls
     # downloading if data we need is not in the right directory
-
-    # Note to baobao: this is where hyperparameters from sweep are made visible
-    # to the existing code in this script
     overrides = wandb.config
     with open(hparams_file) as fin:
         hparams = load_hyperpyyaml(fin, overrides)
 
+    # Note to baobao: this is where hyperparameters from sweep are made visible
+    # to the existing code in this script
     hparams['batch_size'] = wandb.config.batch_size
     hparams['lr_start'] = wandb.config.lr_start
     hparams['lr_final'] = wandb.config.lr_final
@@ -604,7 +604,7 @@ if __name__ == "__main__":
         'method': 'random',
         'name': 'sweep',
         'metric': {
-            'goal': 'maximize',
+            'goal': 'minimize',
             # Note for baobao:
             # The name of this variable MUST match the name of a key going into 'wandb.log'
             'name': 'validation_loss'
