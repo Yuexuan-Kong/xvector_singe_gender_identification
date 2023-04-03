@@ -205,7 +205,7 @@ class gender_rec_Brain(sb.Brain):
                 "loss": stage_loss,
                 "error": self.error_metrics.summarize("average"),
             }
-            wandb.log({'validation_error', stats['error']})
+            wandb.log({'validation_error': stats['error']})
 
         # At the end of validation...
         if stage == sb.Stage.VALID:
@@ -515,6 +515,9 @@ def main():
     hparams['lr_final'] = wandb.config.lr_final
     hparams['emb_dim'] = wandb.config.emb_dim
 
+    hparams['dropout'] = wandb.config.embedding_dropout
+    hparams['final_dropout'] = wandb.config.classifier_dropout
+
     # change work dir to the parent folder
     run_opts["device"] ="cuda:0"
     # run_opts["device"] = "cpu"
@@ -615,13 +618,18 @@ if __name__ == "__main__":
             # The name of this variable MUST match the name of a key going into 'wandb.log'
             'name': 'validation_error'
         },
-        'parameters':
-        {
+        'parameters': {
             'batch_size': {'values': [8, 16, 32]},
             'lr_start': {'values': [0.015, 0.01, 0.05]},
             'lr_final': {'values': [0.0015, 0.001, 0.0001]},
             'emb_dim': {'values': [32, 64, 128]},
-         }
+            'embedding_dropout': {'values': [0.1, 0.3, 0.5]},
+            'classifier_dropout': {'values': [0.1, 0.2]},
+        },
+        'early_terminate': {
+            'type': 'hyperband',
+            'min_iter': 3,
+        }
     }
     sweep_id = wandb.sweep(sweep=sweep_configuration, project='ISMIR-2023')
     print(f'Starting wandb run for sweep_id: {sweep_id}')

@@ -48,6 +48,7 @@ class Xvector(torch.nn.Module):
         tdnn_dilations=[1, 2, 3, 1, 1],
         lin_neurons=512,
         in_channels=40,
+        final_dropout=0.1
     ):
 
         super().__init__()
@@ -90,7 +91,7 @@ class Xvector(torch.nn.Module):
         )
 
         self.blocks.append(
-            Dropout2d(drop_rate=0.1)
+            Dropout2d(drop_rate=final_dropout)
         )
 
 
@@ -144,6 +145,7 @@ class Classifier(sb.nnet.containers.Sequential):
         lin_blocks=1,
         lin_neurons=512,
         out_neurons=2,
+        dropout=0.3
     ):
         super().__init__(input_shape=input_shape)
 
@@ -172,7 +174,7 @@ class Classifier(sb.nnet.containers.Sequential):
                 sb.nnet.normalization.BatchNorm1d, layer_name="norm"
             )
             self.DNN[block_name].append(
-                Dropout2d(drop_rate=0.3)
+                Dropout2d(drop_rate=dropout)
             )
 
         # Final Softmax classifier
