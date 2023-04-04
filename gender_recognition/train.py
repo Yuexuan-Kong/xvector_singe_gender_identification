@@ -519,7 +519,7 @@ def main():
     hparams['final_dropout'] = wandb.config.classifier_dropout
 
     # change work dir to the parent folder
-    run_opts["device"] ="cuda:0"
+    run_opts["device"] = set_gpus()
     # run_opts["device"] = "cpu"
     # run_opts["debug"] = True
     # run_opts["debug_batches"] = 1
@@ -622,9 +622,9 @@ if __name__ == "__main__":
             'batch_size': {'values': [8, 16, 32]},
             'lr_start': {'values': [0.015, 0.01, 0.05]},
             'lr_final': {'values': [0.0015, 0.001, 0.0001]},
-            'emb_dim': {'values': [32, 64, 128]},
+            'emb_dim': {'values': [32, 64]},
             'embedding_dropout': {'values': [0.1, 0.3, 0.5]},
-            'classifier_dropout': {'values': [0.1, 0.2]},
+            'classifier_dropout': {'values': [0.1, 0.2, 0.3]},
         },
         'early_terminate': {
             'type': 'hyperband',
