@@ -5,7 +5,6 @@ validation, and test sets.
 """
 
 import os
-import ujson as json
 import random
 import logging
 import numpy as np
@@ -184,124 +183,6 @@ def check_folders(*folders):
     return True
 
 
-def split_sets_sid(df, split_ratio):
-    """Split the Dataframe of all raw information so that all the classes have the
-    same proportion of samples (e.g, spk01 should have 80% of samples in
-    training, 10% validation, 10% test, the same for speaker2 etc.).
-
-    Arguments
-    ---------
-    df: pandas.Dataframe
-        Dataframe of all the information about tracks used for training.
-    split_ratio: list
-        List composed of three integers that sets split ratios for train, valid,
-        and test sets, respectively. For instance split_ratio=[80, 10, 10] will
-        assign 80% of the sentences to training, 10% for validation, and 10%
-        for test.
-
-    Returns
-    ------
-    Dictionary of Pandas Dataframe containing train, valid, and test splits.
-    """
-    train = df.groupby('unique_artist_id').sample(frac=split_ratio[0]*0.01, random_state=43)
-    rest = df.drop(train.index)
-    test = rest.groupby('unique_artist_id').sample(frac=split_ratio[1]/(split_ratio[2]+split_ratio[1]), random_state=43)
-    valid = rest.drop(test.index)
-    data_split = {"train": train, "test": test, "valid": valid}
-    return data_split
-
-
-def split_sets_gender(df, golden_path, split_ratio):
-    """
-    This function is used to separate dataset by singer-wise for gender recognition. We want singers in test sets have
-    not showed up in the training set yet. Test set is reading from the manually annotated golden dataset.
-    Parameters
-    ----------
-    df: pandas.Dataframe
-        Dataframe to be separated into training and validation datasets
-    split_ratio: list
-        Split ratio for training and validation
-
-    Returns
-    -------
-    Dictionary of Pandas Dataframe containing train, valid, and test splits.
-    """
-
-    # Read golden test dataset for test.
-    test = pd.read_pickle(golden_path)
-
-    # Group by artist id
-    artist_count = df.groupby(["unique_artist_id"])["SNG_ID"].count().reset_index(name="count").sort_values(["count"],
-                                                                                              ascending=False)
-    train_artist = artist_count.sample(frac=split_ratio[0]*0.01, random_state=43)
-    train = df[df["unique_artist_id"].isin(train_artist.unique_artist_id)]
-    valid = df.drop(train.index)
-    data_split = {"train": train, "test": test, "valid": valid}
-    return data_split
-
-
-def create_golden_json(df, json_file, add_spleeter, original_folder, voice_folder):
-    """
-    Similar function to create_json, but for test dataset, we take the whole segments instead of random
-    sampled ones.
-    Parameters
-    ----------
-    df: pandas.Dataframe
-    json_file: str
-        Path to save golden json file
-    add_spleeter: Bool
-        If add spleeter or not.
-    original_folder: str
-        Path to folder where original tracks are saved.
-    voice_folder: str
-        Path to folder where separated voices are saved.
-
-    """
-    json_dict = {}
-    for s, row in tqdm(df.iterrows(), total=df.shape[0]):
-
-        duration = round(row["lyrics_end"]-row["lyrics_start"], 1)
-        try:
-            gender = "man" if row["gender_gt"]==1 else "woman"
-        except KeyError:
-            gender = "man" if row["gender"]==1 else "woman"
-
-        # Select the whole segment, so that we are sure there's singing voice
-        path = original_folder+str(s)+".wav"
-
-        json_dict[str(s)+f"_origin"] = {
-            "wav": path,
-            "start": 0,
-            "end": duration,
-            "length": duration,
-            "gender": gender
-        }
-        if add_spleeter:
-            path = voice_folder + "spleetered_golden_test/" + str(s) + "/" + os.listdir(voice_folder+"spleetered_golden_test/"
-                                                                                  + str(s))[0] +"/vocals.wav"
-
-            json_dict[str(s)+f"_voice"] = {
-                "wav": path,
-                "start": 0,
-                "end": duration,
-                "length": duration,
-                "gender": gender
-            }
-
-            # path = voice_folder + "spleetered_golden_test/" + str(s) + "/" + os.listdir(voice_folder+"spleetered_golden_test/"
-            #                                                                             + str(s))[0] +"/accompaniment.wav"
-            # json_dict[str(s)+f"_acc"] = {
-            #     "wav": path,
-            #     "start": 0,
-            #     "end": duration,
-            #     "length": duration,
-            #     "gender": gender
-            # }
-        # Writing the dictionary to the json file
-    with open(json_file, mode="w") as json_f:
-        json.dump(json_dict, json_f, indent=2)
-    logger.info(f"{json_file} successfully created!")
-
 def create_json_1200(df, json_file, test_folder):
     """
     Similar function to create_json, but for test dataset, we take the whole segments instead of random
@@ -337,7 +218,7 @@ def create_json_1200(df, json_file, test_folder):
     logger.info(f"{json_file} successfully created!")
 
 
-def create_json_new_training(df, json_file, add_spleeter, chunk_length, original_folder, voice_folder):
+def create_json_new_training(df, df_lyrics, json_file, original_folder, voice_folder):
     """
     Creates the json file given a dataframe of track's and singer's information. For female singers, tracks sample two
     time than normal.
@@ -359,94 +240,113 @@ def create_json_new_training(df, json_file, add_spleeter, chunk_length, original
     """
     # Processing all the wav files in the list
     json_dict = {}
-    min_c = chunk_length[0]
-    max_c = chunk_length[1]
     for s, row in tqdm(df.iterrows(), total=df.shape[0]):
 
-        # Use Audio class to take care of audio processing
-        # Reading the signal (to retrieve duration in seconds)
         gender = 1 if np.isnan(row["gender"]) else row["gender"]
-        # audio_mixed = Audio(song_id, type="mixed", lyrics_start=row["lyrics_start"], lyrics_end=row["lyrics_end"])
         duration = row["lyrics_end"]-row["lyrics_start"]
+        segments = df_lyrics[df_lyrics.SNG_ID==int(row["SNG_ID"])].segments.to_list()[0]
 
-        # Create entry for this utterance. For each track with duration x seconds, we sample it
-        # x/6 times. ex. A track of 12s, we sample two times from it. Each time, the utterance length
-        # is a random number between 3 and x seconds. For the same example, the duration of two samples
-        # vary from 3s to 12s. If the singer is female, then we sample it x/3 times.
-        for i in range(0, int(round(duration/10)*gender)):
-
-            # Random select segment that are larger than 3s and 10s
-            path = original_folder+str(row["SNG_ID"])+".wav"
-            start = round(random.uniform(0, duration-min_c), 1)
-            end = round(random.uniform(start+min_c, min(start+max_c, duration)), 1)
-
-            g = "man" if gender==1 else "woman"
-            json_dict[str(row["SNG_ID"])+f"_origin_{i+1}"] = {
-                "wav": path,
-                "start": start,
-                "end": end,
-                "length": round(end-start, 1),
-                "gender": g,
-            }
-            if add_spleeter:
-                start = round(random.uniform(0, duration-min_c), 1)
-                end = round(random.uniform(start+min_c, min(start+max_c, duration)), 1)
-                path = voice_folder+str(row["SNG_ID"])+".wav"
-
-                json_dict[str(row["SNG_ID"])+f"_voice_{i+1}"] = {
+        for i in range(0, len(segments)):
+            segment = segments[i]
+            k=0
+            if segment[1]-segment[0]<=3:
+                add_spleeter = random.choice([True, False])
+                path = original_folder + str(row["SNG_ID"]) + ".wav"
+                start = round(segment[0]-row["lyrics_start"]-random.uniform(-0.5, 1), 1)
+                end = round(start+3, 1)
+                if add_spleeter:
+                    path = voice_folder + str(row["SNG_ID"]) + ".wav"
+                g = "man" if gender==1 else "woman"
+                k = k+1
+                json_dict[str(row["SNG_ID"]) + f"_{k}"] = {
                     "wav": path,
                     "start": start,
                     "end": end,
-                    "length": round(end-start, 1),
+                    "length": round(end - start, 1),
                     "gender": g,
                 }
+            else:
+                for iter in range(0, int(duration/4*gender)):
+                    add_spleeter = random.choice([True, False])
+                # Random select segment that are larger than 3s and 10s
+                    path = original_folder+str(row["SNG_ID"])+".wav"
+                    if add_spleeter:
+                        path = voice_folder + str(row["SNG_ID"]) + ".wav"
+                    start = round(random.uniform(0, duration-3), 1)
+                    end = round(start + 3, 1)
+                    k = k+1
+
+                    g = "man" if gender==1 else "woman"
+                    json_dict[str(row["SNG_ID"])+f"_{k}"] = {
+                        "wav": path,
+                        "start": start,
+                        "end": end,
+                        "length": round(end-start, 1),
+                        "gender": g,
+                    }
         # Writing the dictionary to the json file
     with open(json_file, mode="w") as json_f:
         json.dump(json_dict, json_f, indent=2)
     logger.info(f"{json_file} successfully created!")
 
 
-def create_json_whole_segment(df, json_file, original_folder):
-    """
-    Create a json file for validation dataset that has all segments of tracks, instead of sampling randomly, used to
-    calculate bias, and to see if the error rate is still a lot higher than golden test dataset.
-    Arguments
-    ---------
-    df : pandas.Dataframe
-        Dataframe of gender, lyrics_start, lyrics_end and song_id
-    json_file : str
-        The path of the output json file
-    add_spleeter : bool
-        If add the same track but separated voice.
-    original_folder : str
-        Path to the folder where origined cropped tracks are saved.
-    voice_folder : str
-        Path to the folder where only voices of cropped tracks are saved.
-    """
-    # Processing all the wav files in the list
-    json_dict = {}
-    for s, row in tqdm(df.iterrows(), total=df.shape[0]):
+def process_lyrics(df, df_train, list_songs):
+    df = df.groupby(['SNG_ID']).agg(tuple).applymap(list).reset_index()
+    df.lyrics_total_duration = df.lyrics_total_duration.apply(lambda x: int(list(set(x))[0]))
+    df.lyrics_start = df.lyrics_start.apply(lambda x: list(set(x))[0])
+    df.PRODUCT_TRACK_ID = df.PRODUCT_TRACK_ID.apply(lambda x: list(set(x))[0])
 
-        gender = 1 if np.isnan(row["gender"]) else row["gender"]
-        # Random select segment that are larger than 3s and 10s
-        path = original_folder+str(row["SNG_ID"])+".wav"
-        duration = round(row["lyrics_end"] - row["lyrics_start"], 1)
+    new_df = []
 
-        g = "man" if gender==1 else "woman"
-        json_dict[str(row["SNG_ID"])] = {
-            "wav": path,
-            "start": 0,
-            "end": duration,
-            "length": duration,
-            "gender": g,
-        }
-        # Writing the dictionary to the json file
-    with open(json_file, mode="w") as json_f:
-        json.dump(json_dict, json_f, indent=2)
-    logger.info(f"{json_file} successfully created!")
+    for SNG_ID in list_songs:
+        row = df[df.PRODUCT_TRACK_ID == int(SNG_ID)]
+        real_song_id = df_train[df_train.PRODUCT_TRACK_ID==SNG_ID].SNG_ID.to_list()[0]
+        new_row = [real_song_id, row["lyrics_total_duration"].to_list()[0], row["lyrics_start"].to_list()[0]]
+
+        durations = row["duration"].to_list()[0]
+        starts = row["start"].to_list()[0]
+        n = len(starts)
+        i = 0
+        start = starts[i]
+        end = starts[i]+durations[i]
+
+        segments = []
+
+        while i<=n-2:
+            if i<n-2 and int(starts[i]+durations[i])==int(starts[i+1]):
+                end = end+durations[i+1]
+            elif i==n-2 and int(starts[i]+durations[i])==int(starts[i+1]):
+                end = end + durations[i + 1]
+                segments.append([start, end])
+                break
+            elif i<n-1:
+                segments.append([start, end])
+                start = starts[i+1]
+                end = starts[i+1]+durations[i+1]
+            else:
+                segments.append([starts[i], starts[i]+durations[i]])
+
+            i = i+1
+        new_row.append(segments)
+        new_df.append(new_row)
+
+    new_df = pd.DataFrame(new_df, columns=["SNG_ID", "lyrics_total_duration", "lyrics_start", 'segments'])
+    new_df.to_pickle("../data/song_lyrics_segments.pkl")
+
+    return new_df
+
+
+
+
+
 
 if __name__ == "__main__":
-    df_test = pd.read_csv("../data/test_annotation.csv", sep=";")
-    create_json_1200(df_test, "test.json", "../data/1200_segments/")
+    # df_test = pd.read_csv("../data/test_annotation.csv", sep=";")
+    # create_json_1200(df_test, "test.json", "../data/1200_segments/")
     df_train = pd.read_csv("../data/train_exclude_unique.csv")
-    create_json_new_training(df_train, "train.json", True, [3,3], "../data/origins/", "../data/voices/")
+    list_songs = df_train.PRODUCT_TRACK_ID.to_list()
+    # df_lyrics = pd.read_csv("../data/lyrics_info.csv")
+    # process_lyrics(df_lyrics, df_train, list_songs)
+    df_lyrics = pd.read_pickle("../data/song_lyrics_segments.pkl")
+    create_json_new_training(df_train, df_lyrics, "train_new.json", "../data/origins/", "../data/voices/")
+    # create_json_new_traiqning(df_train, "train.json", True, [3,3], "../data/origins/", "../data/voices/")
