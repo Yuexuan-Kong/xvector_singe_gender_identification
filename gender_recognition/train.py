@@ -591,6 +591,7 @@ def main():
     # Speechbrain.utils.checkpoints - Would load a checkpoint here, but none found yet.
     # fit() function is from Brain class, I can pass dataloader shuffle in train_loader_kwargs, which is saved in
     # train_1998.yaml
+    import pdbr;pdbr.set_trace()
     fit_func(hparams)
 
     # Load the best checkpoint for evaluation
