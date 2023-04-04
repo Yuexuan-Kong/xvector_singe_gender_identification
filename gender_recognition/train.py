@@ -628,4 +628,4 @@ if __name__ == "__main__":
     }
     sweep_id = wandb.sweep(sweep=sweep_configuration, project='ISMIR-2023')
     print(f'Starting wandb run for sweep_id: {sweep_id}')
-    wandb.agent(sweep_id, function=main, count=10)
+    wandb.agent(sweep_id, function=main, count=20)
