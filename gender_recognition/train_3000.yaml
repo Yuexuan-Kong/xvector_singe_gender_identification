@@ -34,7 +34,7 @@ tensorboard_logs_test_folder: !ref <output_folder>/tb_logs_embedding_test/
 
 # Path where data manifest files will be stored
 # The data manifest files are created by the data preparation script.
-train_annotation: !ref train.json
+train_annotation: !ref train_new.json
 valid_annotation: !ref test.json
 test_annotation: !ref test.json
 
