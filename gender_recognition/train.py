@@ -489,6 +489,7 @@ def fit_func(hparams):
     )
 
 def main():
+    import pdbr;pdbr.set_trace()
     run = wandb.init(project='ISMIR-2023')
     # Reading command line arguments.
     global run_opts  # Makes run_opts global
@@ -522,8 +523,6 @@ def main():
     run_opts["device"] = set_gpus()
     # run_opts["device"] = "cpu"
     # run_opts["debug"] = True
-    # run_opts["debug_batches"] = 1
-    # run_opts["debug_epochs"] = 2
     hparams["dataloader_options"]["shuffle"] = True
 
     # This function will download files needed for augmentation and put them under ./data
@@ -591,7 +590,6 @@ def main():
     # Speechbrain.utils.checkpoints - Would load a checkpoint here, but none found yet.
     # fit() function is from Brain class, I can pass dataloader shuffle in train_loader_kwargs, which is saved in
     # train_1998.yaml
-    import pdbr;pdbr.set_trace()
     fit_func(hparams)
 
     # Load the best checkpoint for evaluation
@@ -600,13 +598,6 @@ def main():
         min_key="error",
         test_loader_kwargs=hparams["dataloader_options"],
     )
-
-    # for i in ["subset_0.json", "subset_1.json", "subset_2.json", "subset_3.json", "subset_4.json"]:
-    #     bootstrap_test_stats = gender_rec_brain.evaluate(
-    #         test_set=datasets[i],
-    #         min_key="error",
-    #         test_loader_kwargs=hparams["dataloader_options"],
-    #     )
 
 # Recipe begins!
 if __name__ == "__main__":
@@ -633,6 +624,5 @@ if __name__ == "__main__":
         }
     }
     sweep_id = wandb.sweep(sweep=sweep_configuration, project='ISMIR-2023')
-    import pdbr;pdbr.set_trace()
     print(f'Starting wandb run for sweep_id: {sweep_id}')
     wandb.agent(sweep_id, function=main, count=10)

@@ -56,14 +56,14 @@ n_fft: 800
 sample_rate: 16000
 number_of_epochs: 5
 batch_size: 16
-lr_start: 0.005 #0.001
-lr_final: 0.001 #0.0001
+lr_start: 0.00005 #0.001
+lr_final: 0.00001 #0.0001
 # TODO change number of classes
 n_classes: 2
 emb_dim: 64 # dimensionality of the embeddings
 dataloader_options:
     batch_size: !ref <batch_size>
-    num_workers:  0 #TODO: to change
+    num_workers:  35 #TODO: to change
     shuffle: True
 
 
