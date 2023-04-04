@@ -16,8 +16,10 @@ reverberation are automatically added to each sample from OpenRIR.
 """
 import os
 import sys
+from typing import Dict
 
 import numpy as np
+import wandb
 import torch
 import torchaudio
 import speechbrain as sb
@@ -29,9 +31,10 @@ from speechbrain.utils.distributed import ddp_init_group
 from speechbrain.utils.data_pipeline import provides
 from speechbrain.dataio import dataio, dataset
 from speechbrain.nnet import schedulers, losses
-from prepare_data import prepare_json_files
+from prepare_data import prepare_json_files, random
 from torch.utils.data import DataLoader
 from speechbrain.dataio.dataloader import LoopedLoader
+
 
 
 # Brain class for speech enhancement training
@@ -194,6 +197,7 @@ class gender_rec_Brain(sb.Brain):
         # Store the train loss until the validation stage.
         if stage == sb.Stage.TRAIN:
             self.train_loss = stage_loss
+            wandb.log({"training_loss": stage_loss})
 
         # Summarize the statistics from the stage for record-keeping.
         else:
@@ -201,6 +205,7 @@ class gender_rec_Brain(sb.Brain):
                 "loss": stage_loss,
                 "error": self.error_metrics.summarize("average"),
             }
+            wandb.log({'validation_error': stats['error']})
 
         # At the end of validation...
         if stage == sb.Stage.VALID:
@@ -225,6 +230,11 @@ class gender_rec_Brain(sb.Brain):
             # Save the current checkpoint and delete previous checkpoints,
             self.checkpointer.save_and_keep_only(meta=stats, min_keys=["error"])
 
+            wandb.log({
+                'lr': new_lr,
+                'validation_loss': stage_loss,
+            })
+
         # We also write statistics about test data to stdout and to the logfile.
         if stage == sb.Stage.TEST :
 
@@ -239,6 +249,9 @@ class gender_rec_Brain(sb.Brain):
                     metadata_header=["gender", "song_id"],
                     global_step=self.hparams.epoch_counter.current
                 )
+            wandb.log({
+                'test_loss': stage_loss,
+            })
         torch.cuda.empty_cache()
 
     def evaluate(
@@ -434,6 +447,7 @@ def dataio_prep(hparams):
 
     # Define datasets. We also connect the dataset with the data processing
     # functions defined above.
+    global datasets
     datasets = {}
     # we sort the dataset based on length to speed-up training because there will be less padding
     # It can also to shuffle the dataset
@@ -465,7 +479,7 @@ def dataio_prep(hparams):
 
 
 # @profile(filename="profile.ps")
-def fit_func():
+def fit_func(hparams):
     gender_rec_brain.fit(
         epoch_counter=gender_rec_brain.hparams.epoch_counter,
         train_set=datasets["train"],
@@ -474,14 +488,12 @@ def fit_func():
         valid_loader_kwargs=hparams["dataloader_options"],
     )
 
-
-# Recipe begins!
-if __name__ == "__main__":
-
+def main():
+    run = wandb.init(project='ISMIR-2023')
     # Reading command line arguments.
+    global run_opts  # Makes run_opts global
     hparams_file, run_opts, overrides = sb.parse_arguments(sys.argv[1:])
-
-    os.environ['KMP_DUPLICATE_LIB_OK']='True'  
+    os.environ['KMP_DUPLICATE_LIB_OK']='True'
     run_opts["debug"] = False
 
     # Initialize ddp (useful only for multi-GPU DDP training).
@@ -489,12 +501,25 @@ if __name__ == "__main__":
 
     # Load hyperparameters file with command-line overrides. Have to change directory before it, because it calls
     # downloading if data we need is not in the right directory
-
+    overrides = wandb.config
+    overrides.update({'seed': random.randint(0, 10000)})
+    print(f"Setting seed to: {overrides['seed']}")
+    wandb.log({'seed': overrides['seed']})
     with open(hparams_file) as fin:
         hparams = load_hyperpyyaml(fin, overrides)
 
+    # Note to baobao: this is where hyperparameters from sweep are made visible
+    # to the existing code in this script
+    hparams['batch_size'] = wandb.config.batch_size
+    hparams['lr_start'] = wandb.config.lr_start
+    hparams['lr_final'] = wandb.config.lr_final
+    hparams['emb_dim'] = wandb.config.emb_dim
+
+    hparams["final_dropout"] = wandb.config.embedding_dropout
+    hparams["dropout"] = wandb.config.classifier_dropout
+
     # change work dir to the parent folder
-    run_opts["device"] ="cuda:0"
+    run_opts["device"] = set_gpus()
     # run_opts["device"] = "cpu"
     # run_opts["debug"] = True
     # run_opts["debug_batches"] = 1
@@ -544,12 +569,12 @@ if __name__ == "__main__":
     # # Create dataset objects "train", "valid", and "test".
     # Load dataset in objects
     datasets = dataio_prep(hparams)
-    #
     # Fetch and load pretrained modules
     sb.utils.distributed.run_on_main(hparams["pretrainer"].collect_files)
     hparams["pretrainer"].load_collected(device=run_opts["device"])
 
     # Initialize the Brain object to prepare for mask training.
+    global gender_rec_brain
     gender_rec_brain = gender_rec_Brain(
         modules=hparams["modules"],
         opt_class=hparams["opt_class"],
@@ -557,6 +582,7 @@ if __name__ == "__main__":
         run_opts=run_opts,
         checkpointer=hparams["checkpointer"],
     )
+    wandb.watch(gender_rec_brain.modules.embedding_model)
     # The `fit()` method iterates the training loop, calling the methods
     # necessary to update the parameters of the model. Since all objects
     # with changing state are managed by the Checkpointer, training can be
@@ -565,7 +591,8 @@ if __name__ == "__main__":
     # Speechbrain.utils.checkpoints - Would load a checkpoint here, but none found yet.
     # fit() function is from Brain class, I can pass dataloader shuffle in train_loader_kwargs, which is saved in
     # train_1998.yaml
-    fit_func()
+    import pdbr;pdbr.set_trace()
+    fit_func(hparams)
 
     # Load the best checkpoint for evaluation
     test_stats = gender_rec_brain.evaluate(
@@ -580,3 +607,32 @@ if __name__ == "__main__":
     #         min_key="error",
     #         test_loader_kwargs=hparams["dataloader_options"],
     #     )
+
+# Recipe begins!
+if __name__ == "__main__":
+    sweep_configuration = {
+        'method': 'random',
+        'name': 'sweep',
+        'metric': {
+            'goal': 'minimize',
+            # Note for baobao:
+            # The name of this variable MUST match the name of a key going into 'wandb.log'
+            'name': 'validation_error'
+        },
+        'parameters': {
+            'batch_size': {'values': [8, 16, 32]},
+            'lr_start': {'values': [0.015, 0.01, 0.05]},
+            'lr_final': {'values': [0.0015, 0.001, 0.0001]},
+            'emb_dim': {'values': [32, 64]},
+            'embedding_dropout': {'values': [0.1, 0.3, 0.5]},
+            'classifier_dropout': {'values': [0.1, 0.2, 0.3]},
+        },
+        'early_terminate': {
+            'type': 'hyperband',
+            'min_iter': 3,
+        }
+    }
+    sweep_id = wandb.sweep(sweep=sweep_configuration, project='ISMIR-2023')
+    import pdbr;pdbr.set_trace()
+    print(f'Starting wandb run for sweep_id: {sweep_id}')
+    wandb.agent(sweep_id, function=main, count=10)
