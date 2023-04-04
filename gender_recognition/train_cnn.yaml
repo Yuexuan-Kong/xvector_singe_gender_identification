@@ -34,9 +34,9 @@ tensorboard_logs_test_folder: !ref <output_folder>/tb_logs_embedding_test/
 
 # Path where data manifest files will be stored
 # The data manifest files are created by the data preparation script.
-train_annotation: !ref train_new.json
-valid_annotation: !ref test.json
-test_annotation: !ref test.json
+train_annotation: !ref train.json
+valid_annotation: !ref train_small.json
+test_annotation: !ref train_small.json
 
 # The train logger writes training statistics to a file, as well as stdout.
 train_logger: !new:speechbrain.utils.train_logger.FileTrainLogger
@@ -54,7 +54,7 @@ n_fft: 800
 
 # Training Parameters
 sample_rate: 16000
-number_of_epochs: 200
+number_of_epochs: 5
 batch_size: 16
 lr_start: 0.005 #0.001
 lr_final: 0.001 #0.0001
@@ -63,7 +63,7 @@ n_classes: 2
 emb_dim: 64 # dimensionality of the embeddings
 dataloader_options:
     batch_size: !ref <batch_size>
-    num_workers: 36 #TODO: to change
+    num_workers:  0 #TODO: to change
     shuffle: True
 
 
@@ -77,6 +77,12 @@ compute_features: !new:speechbrain.lobes.features.Fbank
 mean_var_norm: !new:speechbrain.processing.features.InputNormalization
     norm_type: sentence
     std_norm: True
+
+# Adds speech change + time and frequency dropouts (time-domain implementation)
+# # A small speed change help to improve the performance of speaker-id as well.
+augmentation: !new:speechbrain.lobes.augment.TimeDomainSpecAugment
+    sample_rate: !ref <sample_rate>
+    speeds: [95, 100, 105]
 
 # To design a custom model, either just edit the simple CustomModel
 # class that's listed here, or replace this `!new` call with a line

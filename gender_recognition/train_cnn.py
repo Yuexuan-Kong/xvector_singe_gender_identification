@@ -114,7 +114,7 @@ class CNN_Gender(sb.Brain):
 
         # Compute the cost function
         loss = sb.nnet.losses.nll_loss(torch.log(predictions.squeeze()), gender.squeeze().squeeze())
-        print(gender)
+        import pdbr;pdbr.set_trace()
         # Append this batch of losses to the loss metric for easy
         self.loss_metric.append(batch.id, torch.log(predictions.squeeze()), gender.squeeze().squeeze(), reduction="batch")
 
@@ -470,8 +470,8 @@ if __name__ == "__main__":
         hparams = load_hyperpyyaml(fin, overrides)
 
     # change work dir to the parent folder
-    run_opts["device"] = set_gpus()
-    # run_opts["device"] = "cpu"
+    # run_opts["device"] = set_gpus()
+    run_opts["device"] = "cpu"
     # run_opts["debug_batches"] = 1
     # run_opts["debug_epochs"] = 2
     hparams["dataloader_options"]["shuffle"] = True
@@ -515,4 +515,3 @@ if __name__ == "__main__":
         min_key="error",
         test_loader_kwargs=hparams["dataloader_options"],
     )
-
