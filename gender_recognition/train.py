@@ -515,8 +515,8 @@ def main():
     hparams['lr_final'] = wandb.config.lr_final
     hparams['emb_dim'] = wandb.config.emb_dim
 
-    hparams['embedding_model']["final_dropout"] = wandb.config.embedding_dropout
-    hparams['classifier']["dropout"] = wandb.config.classifier_dropout
+    hparams["final_dropout"] = wandb.config.embedding_dropout
+    hparams["dropout"] = wandb.config.classifier_dropout
 
     # change work dir to the parent folder
     run_opts["device"] = set_gpus()
