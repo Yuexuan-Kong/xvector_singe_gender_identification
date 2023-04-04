@@ -66,8 +66,8 @@ dataloader_options:
     batch_size: !ref <batch_size>
     num_workers: 16
     shuffle: True
-final_dropout: nil
-dropout: nil
+final_dropout: 0.2
+dropout: 0.2
 
 
 # Added noise and reverb come from OpenRIR dataset, automatically
