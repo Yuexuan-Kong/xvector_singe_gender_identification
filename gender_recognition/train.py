@@ -513,6 +513,7 @@ def main():
         'lr_start': wandb.config.lr_start,
         'lr_final': wandb.config.lr_final,
         'emb_dim': wandb.config.emb_dim,
+        'train_annotation': wandb.config.training_data
     }
     print(f"Setting seed to: {overrides['seed']}")
     wandb.log({'seed': overrides['seed']})
@@ -521,7 +522,7 @@ def main():
         hparams = load_hyperpyyaml(fin, overrides)
 
     # change work dir to the parent folder
-    run_opts["device"] ="cuda:0"
+    run_opts["device"] = set_gpus()
     # run_opts["device"] = "cpu"
     # run_opts["debug"] = True
     hparams["dataloader_options"]["shuffle"] = True
@@ -614,10 +615,11 @@ if __name__ == "__main__":
         'parameters': {
             'batch_size': {'values': [8, 16, 32]},
             'lr_start': {'values': [0.015, 0.01, 0.05]},
-            'lr_final': {'values': [0.0015, 0.001, 0.0001]},
-            'emb_dim': {'values': [32, 64, 128]},
+            'lr_final': {'values': [0.0015, 0.001, 0.005]},
+            'emb_dim': {'values': [32, 64]},
             'classifier_dropout': {'values': [0.1, 0.3, 0.5]},
-            'embedding_dropout': {'values': [0.1, 0.25, 0.4]}
+            'embedding_dropout': {'values': [0.1, 0.25, 0.4]},
+            'training_data': {'values': ['train.json', 'train_no_sep.json']}
         },
         'early_terminate': {
             'type': 'hyperband',

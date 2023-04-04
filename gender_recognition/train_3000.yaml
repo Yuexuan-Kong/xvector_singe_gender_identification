@@ -34,9 +34,9 @@ tensorboard_logs_test_folder: !ref <output_folder>/tb_logs_embedding_test/
 
 # Path where data manifest files will be stored
 # The data manifest files are created by the data preparation script.
-train_annotation: !ref train.json
-valid_annotation: !ref test.json
-test_annotation: !ref test.json
+train_annotation: nil
+valid_annotation: test.json
+test_annotation: test.json
 
 # The train logger writes training statistics to a file, as well as stdout.
 train_logger: !new:speechbrain.utils.train_logger.FileTrainLogger
@@ -64,7 +64,7 @@ n_classes: 2
 emb_dim: nil  # Note to baobao: this is set by wandb sweep
 dataloader_options:
     batch_size: !ref <batch_size>
-    num_workers: 16
+    num_workers: 30
     shuffle: True
 
 
