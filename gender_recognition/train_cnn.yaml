@@ -54,7 +54,7 @@ n_fft: 800
 
 # Training Parameters
 sample_rate: 16000
-number_of_epochs: 5
+number_of_epochs: 200
 batch_size: 16
 lr_start: 0.00005 #0.001
 lr_final: 0.00001 #0.0001
