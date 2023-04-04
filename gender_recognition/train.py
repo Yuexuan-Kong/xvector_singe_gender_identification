@@ -501,22 +501,23 @@ def main():
 
     # Load hyperparameters file with command-line overrides. Have to change directory before it, because it calls
     # downloading if data we need is not in the right directory
-    overrides = wandb.config
-    overrides.update({'seed': random.randint(0, 10000)})
-    print(f"Setting seed to: {overrides['seed']}")
-    wandb.log({'seed': overrides['seed']})
-    with open(hparams_file) as fin:
-        hparams = load_hyperpyyaml(fin, overrides)
 
     # Note to baobao: this is where hyperparameters from sweep are made visible
     # to the existing code in this script
-    hparams['batch_size'] = wandb.config.batch_size
-    hparams['lr_start'] = wandb.config.lr_start
-    hparams['lr_final'] = wandb.config.lr_final
-    hparams['emb_dim'] = wandb.config.emb_dim
+    overrides = {
+        'seed': random.randint(0, 10000),
+        'classifier': {'dropout': wandb.config.classifier_dropout},
+        'embedding_model': {'final_dropout': wandb.config.embedding_dropout},
+        'batch_size': wandb.config.batch_size,
+        'lr_start': wandb.config.lr_start,
+        'lr_final': wandb.config.lr_final,
+        'emb_dim': wandb.config.emb_dim,
+    }
+    print(f"Setting seed to: {overrides['seed']}")
+    wandb.log({'seed': overrides['seed']})
 
-    hparams['dropout'] = wandb.config.embedding_dropout
-    hparams['final_dropout'] = wandb.config.classifier_dropout
+    with open(hparams_file) as fin:
+        hparams = load_hyperpyyaml(fin, overrides)
 
     # change work dir to the parent folder
     run_opts["device"] ="cuda:0"
@@ -623,8 +624,8 @@ if __name__ == "__main__":
             'lr_start': {'values': [0.015, 0.01, 0.05]},
             'lr_final': {'values': [0.0015, 0.001, 0.0001]},
             'emb_dim': {'values': [32, 64, 128]},
-            'embedding_dropout': {'values': [0.1, 0.3, 0.5]},
-            'classifier_dropout': {'values': [0.1, 0.2]},
+            'classifier_dropout': {'values': [0.1, 0.3, 0.5]},
+            'embedding_dropout': {'values': [0.1, 0.25, 0.4]}
         },
         'early_terminate': {
             'type': 'hyperband',
