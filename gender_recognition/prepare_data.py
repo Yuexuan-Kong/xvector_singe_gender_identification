@@ -5,7 +5,6 @@ validation, and test sets.
 """
 
 import os
-import ujson as json
 import random
 import logging
 import numpy as np
