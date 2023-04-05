@@ -63,7 +63,7 @@ n_classes: 2
 emb_dim: 64 # dimensionality of the embeddings
 dataloader_options:
     batch_size: !ref <batch_size>
-    num_workers:  35 #TODO: to change
+    num_workers:  16 #TODO: to change
     shuffle: True
 
 

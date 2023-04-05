@@ -469,7 +469,7 @@ if __name__ == "__main__":
         hparams = load_hyperpyyaml(fin, overrides)
 
     # change work dir to the parent folder
-    run_opts["device"] = set_gpus()
+    run_opts["device"] = "cuda:0"
     # run_opts["device"] = "cpu"
     # run_opts["debug_batches"] = 1
     # run_opts["debug_epochs"] = 2
