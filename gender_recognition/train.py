@@ -613,13 +613,13 @@ if __name__ == "__main__":
             'name': 'validation_error'
         },
         'parameters': {
-            'batch_size': {'values': [8, 16, 32]},
-            'lr_start': {'values': [0.015, 0.01, 0.05]},
-            'lr_final': {'values': [0.0015, 0.001, 0.005]},
-            'emb_dim': {'values': [32, 64]},
-            'classifier_dropout': {'values': [0.1, 0.3, 0.5]},
-            'embedding_dropout': {'values': [0.1, 0.25, 0.4]},
-            'training_data': {'values': ['train.json', 'train_no_sep.json']}
+            'batch_size': {'values': [16]},
+            'lr_start': {'values': [0.005]},
+            'lr_final': {'values': [0.001]},
+            'emb_dim': {'values': [64]},
+            'classifier_dropout': {'values': [0.3]},
+            'embedding_dropout': {'values': [0.0]},
+            'training_data': {'values': ['train.json']}
         },
         'early_terminate': {
             'type': 'hyperband',
@@ -628,4 +628,4 @@ if __name__ == "__main__":
     }
     sweep_id = wandb.sweep(sweep=sweep_configuration, project='ISMIR-2023')
     print(f'Starting wandb run for sweep_id: {sweep_id}')
-    wandb.agent(sweep_id, function=main, count=20)
+    wandb.agent(sweep_id, function=main, count=5)

@@ -3,6 +3,7 @@
 import torch  # noqa: F401
 import torch.nn as nn
 import speechbrain as sb
+import torchfunc
 from speechbrain.nnet.pooling import StatisticsPooling
 from speechbrain.nnet.CNN import Conv1d
 from speechbrain.nnet.linear import Linear
