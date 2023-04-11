@@ -16,7 +16,6 @@ reverberation are automatically added to each sample from OpenRIR.
 """
 import os
 import sys
-from typing import Dict
 
 import numpy as np
 import wandb
@@ -614,7 +613,7 @@ if __name__ == "__main__":
         },
         'parameters': {
             'batch_size': {'values': [16]},
-            'lr_start': {'values': [0.005]},
+            'lr_start': {'values': [0.007]},
             'lr_final': {'values': [0.001]},
             'emb_dim': {'values': [64]},
             'classifier_dropout': {'values': [0.3]},
@@ -628,4 +627,4 @@ if __name__ == "__main__":
     }
     sweep_id = wandb.sweep(sweep=sweep_configuration, project='ISMIR-2023')
     print(f'Starting wandb run for sweep_id: {sweep_id}')
-    wandb.agent(sweep_id, function=main, count=5)
+    wandb.agent(sweep_id, function=main, count=1)
