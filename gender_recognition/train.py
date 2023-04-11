@@ -490,7 +490,6 @@ def fit_func(hparams):
     )
 
 def main():
-    import pdbr;pdbr.set_trace()
     run = wandb.init(project='ISMIR-2023')
     # Reading command line arguments.
     global run_opts  # Makes run_opts global
