@@ -350,6 +350,7 @@ class gender_rec_Brain(sb.Brain):
         self.step = 0
 
         # save wrong ids to a local pickle file
+        wandb.log({"wrong_ids": wrong_ids})
         import pickle
         with open('wrong_predictions.pkl', 'wb') as f:
             pickle.dump(wrong_ids, f)
