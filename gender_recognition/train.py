@@ -521,7 +521,7 @@ def main():
         hparams = load_hyperpyyaml(fin, overrides)
 
     # change work dir to the parent folder
-    run_opts["device"] = set_gpus()
+    run_opts["device"] = "cuda:0"
     # run_opts["device"] = "cpu"
     # run_opts["debug"] = True
     hparams["dataloader_options"]["shuffle"] = True
@@ -627,4 +627,4 @@ if __name__ == "__main__":
     }
     sweep_id = wandb.sweep(sweep=sweep_configuration, project='ISMIR-2023')
     print(f'Starting wandb run for sweep_id: {sweep_id}')
-    wandb.agent(sweep_id, function=main, count=1)
+    wandb.agent(sweep_id, function=main, count=5)
