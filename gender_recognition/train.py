@@ -613,7 +613,7 @@ if __name__ == "__main__":
         },
         'parameters': {
             'batch_size': {'values': [16]},
-            'lr_start': {'values': [0.007]},
+            'lr_start': {'values': [0.005]},
             'lr_final': {'values': [0.001]},
             'emb_dim': {'values': [64]},
             'classifier_dropout': {'values': [0.3]},
